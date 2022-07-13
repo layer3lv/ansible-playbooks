@@ -1,0 +1,129 @@
+- name: Elasticsearch 8.x setup
+  hosts: all
+  user: ansible
+  become: True
+  tasks:
+
+
+   - name: Update Crypto Policies
+     command: update-crypto-policies --set LEGACY
+     register: bash_out
+
+   - debug: msg="{{ bash_out.stdout }}"
+
+   - debug: msg="{{ bash_out.stderr }}"
+
+   - name: Stop Firewalld
+     command: systemctl stop firewalld
+
+   - name: Disable Firewalld
+     command: systemctl disable firewalld
+
+
+   - name: Add PGP key (Elasticsearch)
+     ansible.builtin.rpm_key:
+       state: present
+       key: https://artifacts.elastic.co/GPG-KEY-elasticsearch
+
+   - name: Add Elasticsearch repository for 8.x packages
+     yum_repository:
+       name: elasticsearch
+       description: Elasticsearch repository for 8.x packages
+       baseurl: https://artifacts.elastic.co/packages/8.x/yum
+       gpgcheck: yes
+
+   - name: Install Java-11-openjdk and Elasticsearch
+     dnf:
+       name: ['java-11-openjdk','elasticsearch']
+       state: present
+       update_cache: True
+
+
+   - name: Backup /etc/elasticsearch/elasticsearch.yml
+     blockinfile:
+       path: /etc/elasticsearch/elasticsearch.yml
+       backup: yes
+       block: |
+
+
+   - name: Remove file content from /etc/elasticsearch/elasticsearch.yml
+     copy: dest=/etc/elasticsearch/elasticsearch.yml content='' force=yes
+
+   - name: Set default settings - /etc/elasticsearch/elasticsearch.yml
+     blockinfile:
+       path: /etc/elasticsearch/elasticsearch.yml
+       block: |
+         cluster.name: my-cluster
+         path.data: /var/lib/elasticsearch
+         path.logs: /var/log/elasticsearch
+
+         xpack.security.enabled: false
+         xpack.security.enrollment.enabled: false
+         xpack.security.http.ssl:
+           enabled: false
+           keystore.path: certs/http.p12
+         xpack.security.transport.ssl:
+           enabled: false
+           verification_mode: certificate
+           keystore.path: certs/transport.p12
+           truststore.path: certs/transport.p12
+
+         node.name: node-1
+         network.host: 0.0.0.0
+         bootstrap.memory_lock: true
+         http.port: 9200
+         cluster.initial_master_nodes: ["node-1"]
+         xpack.monitoring.collection.enabled: false
+
+   - name: Configure Elasticsearch JVM heap size - /etc/elasticsearch/jvm.options
+     blockinfile:
+       path: /etc/elasticsearch/jvm.options
+       backup: yes
+       block: |
+         -Xms1g
+         -Xmx1g
+
+   - name: Enable Elasticsearch service
+     command: systemctl enable "{{ item }}"
+     ignore_errors: true
+     with_items:
+           - elasticsearch
+
+
+   - name: Create /etc/systemd/system/elasticsearch.service.d
+     ansible.builtin.file:
+        path: /etc/systemd/system/elasticsearch.service.d
+        state: directory
+        mode: '0755'
+
+   - name: Create /etc/systemd/system/elasticsearch.service.d/override.conf
+     ansible.builtin.file:
+       path: /etc/systemd/system/elasticsearch.service.d/override.conf
+       state: touch
+       mode: '0644'
+
+   - name: Update /etc/systemd/system/elasticsearch.service.d/override.conf
+     blockinfile:
+       path: /etc/systemd/system/elasticsearch.service.d/override.conf
+       block: |
+         [Service]
+         LimitMEMLOCK=infinity
+
+   - name: Update /etc/security/limits.conf
+     blockinfile:
+       path: /etc/security/limits.conf
+       backup: yes
+       block: |
+         elasticsearch soft memlock unlimited
+         elasticsearch hard memlock unlimited
+
+
+   - name: Systemctl daemon-reload
+     command: systemctl daemon-reload
+
+
+   - name: Start Elasticsearch 8.x service
+     command: systemctl restart  "{{ item }}"
+     ignore_errors: true
+     with_items:
+           - elasticsearch
