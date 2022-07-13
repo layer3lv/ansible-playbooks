@@ -39,7 +39,7 @@
        update_cache: True
 
 
-   - name: Backup /etc/elasticsearch/elasticsearch.yml
+   - name: Backup default /etc/elasticsearch/elasticsearch.yml
      blockinfile:
        path: /etc/elasticsearch/elasticsearch.yml
        backup: yes
