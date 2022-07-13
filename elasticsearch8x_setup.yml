@@ -1,11 +1,10 @@
-# Tested on Oracle Linux 9
+#Tested on Oracle Linux 9
 - name: Elasticsearch 8.x setup
   hosts: all
   user: ansible
   become: True
   tasks:
-
-
+  
    - name: Update Crypto Policies
      command: update-crypto-policies --set LEGACY
      register: bash_out
