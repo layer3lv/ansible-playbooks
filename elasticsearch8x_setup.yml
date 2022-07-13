@@ -1,3 +1,4 @@
+# Tested on Oracle Linux 9
 - name: Elasticsearch 8.x setup
   hosts: all
   user: ansible
