@@ -1,0 +1,34 @@
+---
+# Remove users' SSH keys and sudoers files
+- name: Remove users' SSH keys and sudoers files
+  hosts: test1.com
+  become: yes
+  vars:
+    users_to_remove:
+      - username: test1
+#      - username: user2
+
+  tasks:
+    # Remove users' SSH keys
+    - name: Remove users' SSH keys
+      file:
+        path: "/home/{{ item.username }}/.ssh/authorized_keys"
+        state: absent
+      loop: "{{ users_to_remove }}"
+      ignore_errors: yes  # Ignore errors if authorized_keys file doesn't exist
+
+    # Remove sudoers files for the users
+    - name: Remove sudoers files for the users
+      file:
+        path: "/etc/sudoers.d/{{ item.username }}.sudo"
+        state: absent
+      loop: "{{ users_to_remove }}"
+      ignore_errors: yes  # Ignore errors if file doesn't exist
+
+    # Remove users from the system
+    - name: Remove users from the system
+      user:
+        name: "{{ item.username }}"
+        state: absent
+      loop: "{{ users_to_remove }}"
+      ignore_errors: yes  # Ignore errors if user doesn't exist

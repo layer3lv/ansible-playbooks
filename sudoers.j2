@@ -1,0 +1,4 @@
+# This is the sudoers.j2 template
+
+# Allow {{ item.username }} to execute all commands without a password
+{{ item.username }} ALL=(ALL) NOPASSWD:ALL

@@ -1,0 +1,50 @@
+---
+# Play to create and configure sudo users
+- name: Create and configure sudo users
+  hosts: test1.com
+  become: yes
+  vars:
+    # List of users to create with their usernames and passwords
+    users_to_create:
+      - username: test1
+        password: "user1password"
+#      - username: user2
+#        password: "user2password"
+    # Name of the sudo group
+    sudo_group: "wheel"
+
+  tasks:
+    # Task to create new user accounts with provided usernames and passwords
+    - name: Create the users
+      user:
+        name: "{{ item.username }}"
+        password: "{{ item.password | password_hash('sha512') }}"
+        createhome: yes
+        home: "/home/{{ item.username }}"
+        shell: /bin/bash
+      loop: "{{ users_to_create }}"
+
+    # Task to add the created users to the specified sudo group
+    - name: Add users to the sudo group
+      user:
+        name: "{{ item.username }}"
+        groups: "{{ sudo_group }}"
+        append: yes
+      loop: "{{ users_to_create }}"
+
+    # Task to copy the public keys from /etc/ansible/pubkeys/ to authorized_keys for each user
+    - name: Copy public keys to the users' authorized_keys
+      authorized_key:
+        user: "{{ item.username }}"
+        key: "{{ lookup('file', '/etc/ansible/pubkeys/' + item.username + '.pub') }}"
+      loop: "{{ users_to_create }}"
+
+    # Task to create sudoers files for each user with appropriate permissions
+    - name: Create sudoers files for the users
+      template:
+        src: /etc/ansible/templates/sudoers.j2
+        dest: "/etc/sudoers.d/{{ item.username }}.sudo"
+        owner: root
+        group: root
+        mode: '0440'
+      loop: "{{ users_to_create }}"
